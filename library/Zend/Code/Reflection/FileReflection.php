@@ -275,6 +275,7 @@ class FileReflection implements ReflectionInterface
         $this->classes       = $scanner->getClassNames();
         $this->namespaces    = $scanner->getNamespaces();
         $this->uses          = $scanner->getUses();
+        $this->functions     = $scanner->getFunctions();
     }
 
     /**
