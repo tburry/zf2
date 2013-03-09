@@ -43,7 +43,7 @@ class ReturnTag implements TagInterface, PhpDocTypedTagInterface
         $this->types = explode('|', $matches[1]);
 
         if (isset($matches[2])) {
-            $this->description = trim(preg_replace('#\s+#', ' ', $matches[2]));
+            $this->description = trim($matches[2]);
         }
     }
 

@@ -54,7 +54,7 @@ class ParamTag implements TagInterface, PhpDocTypedTagInterface
         }
 
         if (isset($matches[3])) {
-            $this->description = trim(preg_replace('#\s+#', ' ', $matches[3]));
+            $this->description = trim($matches[3]);
         }
     }
 
