@@ -112,61 +112,64 @@ class DocBlockScanner implements ScannerInterface
         if ($this->isScanned) {
             return;
         }
-
-        $mode = 1;
-
-        $tokens   = $this->tokenize();
-        $tagIndex = null;
-        reset($tokens);
-
-        SCANNER_TOP:
-        $token = current($tokens);
-
-        switch ($token[0]) {
-            case 'DOCBLOCK_NEWLINE':
-                if ($this->shortDescription != '' && $tagIndex === null) {
-                    $mode = 2;
-                } else {
-                    $this->longDescription .= $token[1];
-                }
-                goto SCANNER_CONTINUE;
-
-            case 'DOCBLOCK_WHITESPACE':
-            case 'DOCBLOCK_TEXT':
-                if ($tagIndex !== null) {
-                    $this->tags[$tagIndex]['value'] .= ($this->tags[$tagIndex]['value'] == '') ? $token[1] : ' ' . $token[1];
-                    goto SCANNER_CONTINUE;
-                } elseif ($mode <= 2) {
-                    if ($mode == 1) {
-                        $this->shortDescription .= $token[1];
-                    } else {
-                        $this->longDescription .= $token[1];
-                    }
-                    goto SCANNER_CONTINUE;
-                }
-            case 'DOCBLOCK_TAG':
-                array_push($this->tags, array('name'  => $token[1],
-                                              'value' => ''));
-                end($this->tags);
-                $tagIndex = key($this->tags);
-                $mode     = 3;
-                goto SCANNER_CONTINUE;
-
-            case 'DOCBLOCK_COMMENTEND':
-                goto SCANNER_END;
-
+        
+        $str = trim($this->docComment);
+        $str = str_replace(array("\r\n", "\r"), array("\n", "\n"), $str);
+        
+        // First let's strip out the comment characters.
+        $lines = explode("\n", $str);
+        foreach ($lines as &$line) {
+           $line = preg_replace('`^/\*{2,} ?`', '', $line); // opening /**
+           $line = preg_replace('` ?\*+/$`', '', $line); // closing */
+           $line = preg_replace('`^\s*\* ?`', '', $line); // internal lines.
         }
-
-        SCANNER_CONTINUE:
-        if (next($tokens) === false) {
-            goto SCANNER_END;
+        
+        // Trim leading/trailing whitespace.
+        $lines = explode("\n", trim(implode("\n", $lines)));
+        $tags = array();
+        $currentTagName = null;
+        $currentTag = array();
+        $longDescription = '';
+        
+        // Parse the lines.
+        foreach ($lines as $line) {
+           // Check for a tag.
+           if (preg_match('`^\s*(@[a-z]+)\s*(.*)`i', $line, $matches)) {
+              // Clear out the old tag.
+              if ($currentTagName !== null) {
+                 $tags[] = array(
+                    'name' => $currentTagName,
+                    'value' => implode("\n", $currentTag)
+                    );
+              }
+              
+              // Set the current tag.
+              $currentTagName = $matches[1];
+              $currentTag = array($matches[2]);
+           } else {
+              // This is a description. Either from a tag or the main docblock.
+              if ($currentTagName !== null) {
+                 $currentTag[] = $line;
+              } elseif (!$this->shortDescription) {
+                 $this->shortDescription = $line;
+              } elseif ($longDescription) {
+                 $longDescription .= "\n".$line;
+              } else {
+                 $longDescription = $line;
+              }
+           }
         }
-        goto SCANNER_TOP;
-
-        SCANNER_END:
-
-        $this->shortDescription = rtrim($this->shortDescription);
-        $this->longDescription  = rtrim($this->longDescription);
+        // Clear out the last tag.
+        if ($currentTagName !== null) {
+            $tags[] = array(
+               'name' => $currentTagName,
+               'value' => implode("\n", $currentTag)
+               );
+         }
+           
+        $this->shortDescription = trim($this->shortDescription);
+        $this->longDescription  = trim($longDescription);
+        $this->tags = $tags;
         $this->isScanned        = true;
     }
 
